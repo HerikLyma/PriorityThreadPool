@@ -44,12 +44,9 @@ This example creates a `PriorityThreadPool`, adds two tasks with different prior
 #include "priority_thread_pool.h"
 
 // Function to generate tasks with specified priority and add them to a vector
-void generateTasks(const Priority priority, const int tasks, std::vector<TaskPriority>& out)
-{
-    for (int i = 0; i < tasks; ++i)
-    {
-        Task task = [priority]
-            {
+void generateTasks(const Priority priority, const int tasks, std::vector<TaskPriority>& out) {
+    for (int i = 0; i < tasks; ++i) {
+        Task task = [priority] {
                 std::osyncstream(std::cout) << "Executing " << priority << " priority task!" << std::endl;
             };
         // Add task to the vector
@@ -57,8 +54,7 @@ void generateTasks(const Priority priority, const int tasks, std::vector<TaskPri
     }
 }
 
-int main()
-{
+int main() {
     // Specify the number of worker threads
     const auto workerThreads = 1;
     // Create a thread pool with the specified number of threads
