@@ -42,21 +42,37 @@ This example creates a `PriorityThreadPool`, adds two tasks with different prior
 
 ```cpp
 #include "priority_thread_pool.h"
-#include <iostream>
 
-void printTask(int id) {
-    std::cout << "Task " << id << " is running\n";
+// Function to generate tasks with specified priority and add them to a vector
+void generateTasks(const Priority priority, const int tasks, std::vector<TaskPriority>& out)
+{
+    for (int i = 0; i < tasks; ++i)
+    {
+        Task task = [priority]
+            {
+                std::osyncstream(std::cout) << "Executing " << priority << " priority task!" << std::endl;
+            };
+        // Add task to the vector
+        out.push_back(std::make_pair(std::move(task), priority));
+    }
 }
 
-int main() {
-    PriorityThreadPool threadPool(1);
-
-    // Add multiple tasks with different priorities
-    for (int i = 0; i < 10; ++i) {
-        threadPool.add([i]() { printTask(i); }, Priority::Normal);
-    }
-    threadPool.add([]() { std::cout << "Critical task running\n"; }, Priority::High);
-    threadPool.add([]() { std::cout << "Low priority task running\n"; }, Priority::Lowest);
+int main()
+{
+    // Specify the number of worker threads
+    const auto workerThreads = 1;
+    // Create a thread pool with the specified number of threads
+    PriorityThreadPool pool(workerThreads);
+    // Vector to hold tasks and their priorities
+    std::vector<TaskPriority> tasks;
+    // Generate tasks with different priorities
+    generateTasks(Priority::Normal, 8, tasks);
+    generateTasks(Priority::Lowest, 1, tasks);
+    generateTasks(Priority::High, 2, tasks);
+    generateTasks(Priority::Low, 4, tasks);
+    generateTasks(Priority::Realtime, 1, tasks);
+    // Add all tasks to the thread pool
+    pool.add(tasks);
 
     return 0;
 }
