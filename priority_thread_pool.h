@@ -99,8 +99,8 @@ public:
                     std::unique_lock lock(m_mutex);
                     // Wait until notified or tasks available
                     m_cv.wait(lock, [this] { return m_quit || !m_tasks.empty(); });
-                    if (m_tasks.empty()) {    // If tasks are empty                    
-                        if (m_quit) {         // Check if thread pool is quitting                        
+                    if (m_tasks.empty()) [[unlikely]] {    // If tasks are empty                    
+                        if (m_quit) [[unlikely]] {         // Check if thread pool is quitting                        
                             break;            // Break the loop if quitting
                         }
                         continue;             // Continue to wait for tasks if not quitting
@@ -114,8 +114,8 @@ public:
 #ifdef __linux__
                     int policy;
                     sched_param param;
-                    if (const auto threadId = pthread_self(); pthread_getschedparam(threadId, &policy, &param) == 0) {
-                        if (param.sched_priority != priority) {
+                    if (const auto threadId = pthread_self(); pthread_getschedparam(threadId, &policy, &param) == 0) [[likely]] {
+                        if (param.sched_priority != priority) [[unlikely]] {
                             policy = SCHED_FIFO;
                             param.sched_priority = priority;
                             if (pthread_setschedparam(threadId, policy, &param) != 0) { // If fails                                
@@ -125,9 +125,9 @@ public:
                     }
 #elif _WIN32
                     // Change only if is different
-                    if (const auto threadId = GetCurrentThread(); GetThreadPriority(threadId) != priority) {
+                    if (const auto threadId = GetCurrentThread(); GetThreadPriority(threadId) != priority) [[likely]] {
                         // Change the thread priority on Windows
-                        if (!SetThreadPriority(threadId, priority)) {
+                        if (!SetThreadPriority(threadId, priority)) [[unlikely]] {
                             // If fails
                             std::osyncstream(std::cerr) << errorMessage;
                         }
