@@ -75,3 +75,60 @@ int main() {
 ```
 
 In this example, multiple tasks are added to the `PriorityThreadPool` with different priorities. Each task prints a message to indicate its execution. Tasks with higher priorities may be executed before tasks with lower priorities, and the execution priority can be modified to ensure priority behavior as needed.
+
+## Benchmark Example
+
+```cpp
+#include <chrono>
+#include <cassert>
+#include "priority_thread_pool.h"
+
+std::atomic_uint64_t counter;
+const uint64_t NUM_TASKS = 1000 * std::thread::hardware_concurrency(); // Total number of tasks to be executed
+
+void incCounter() {
+    ++counter;
+}
+
+// Generic function to run a test
+template<typename Function>
+void runTest(const std::string& testName, Function&& func) {
+    counter = 0;
+    std::cout << "Testing: " << testName << std::endl;
+    std::cout << "Total tasks: " << NUM_TASKS << std::endl;
+    const auto start = std::chrono::steady_clock::now();
+    func();
+    const auto end = std::chrono::steady_clock::now();
+    const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    std::cout << "Time taken: " << elapsed << " milliseconds\n" << std::endl;
+    assert(counter == NUM_TASKS);
+}
+
+// Function to compare the performance with PriorityThreadPool and without PriorityThreadPool
+void comparePerformance() {
+    // Test with PriorityThreadPool
+    runTest("With PriorityThreadPool", [] {
+        PriorityThreadPool threadPool;
+        for (int i = 0; i < NUM_TASKS; ++i) {
+            threadPool.add(incCounter);
+        }
+    });
+
+    // Test with thread creation and destruction all the time, as here we don't have refined control
+    // over how many threads we are creating, as there is no pool!
+    runTest("Without PriorityThreadPool", [] {
+        std::vector<std::jthread> threads;
+        threads.reserve(NUM_TASKS);
+        for (int i = 0; i < NUM_TASKS; ++i) {
+            threads.emplace_back(incCounter);
+        }
+    });
+}
+
+int main() {
+    comparePerformance();
+    return 0;
+}
+```
+
+This example performs a benchmark comparing the performance of executing a large number of tasks with and without `PriorityThreadPool`.
