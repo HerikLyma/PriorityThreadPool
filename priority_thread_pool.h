@@ -118,7 +118,7 @@ public:
                         if (param.sched_priority != priority) [[unlikely]] {
                             policy = SCHED_FIFO;
                             param.sched_priority = priority;
-                            if (pthread_setschedparam(threadId, policy, &param) != 0) { // If fails                                
+                            if (pthread_setschedparam(threadId, policy, &param) != 0) [[unlikely]] { // If fails                                
                                 std::osyncstream(std::cerr) << errorMessage;
                             }
                         }
@@ -127,8 +127,7 @@ public:
                     // Change only if is different
                     if (const auto threadId = GetCurrentThread(); GetThreadPriority(threadId) != priority) [[likely]] {
                         // Change the thread priority on Windows
-                        if (!SetThreadPriority(threadId, priority)) [[unlikely]] {
-                            // If fails
+                        if (!SetThreadPriority(threadId, priority)) [[unlikely]] {  // If fails                           
                             std::osyncstream(std::cerr) << errorMessage;
                         }
                     }
