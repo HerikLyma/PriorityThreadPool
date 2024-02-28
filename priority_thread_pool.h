@@ -97,6 +97,8 @@ public:
                 // Get thread ID only once
 #ifdef __linux__
                 const auto threadId = pthread_self();
+                int policy;
+                sched_param param;
 #elif _WIN32
                 const auto threadId = GetCurrentThread();
 #endif
@@ -125,9 +127,7 @@ public:
                     lastPriority = task.second;
                     [[maybe_unused]] const auto priority = static_cast<int>(task.second); // Gets task priority
                     [[maybe_unused]] static constexpr std::string_view errorMessage("Could not change thread priority!\n");
-#ifdef __linux__
-                    int policy;
-                    static thread_local sched_param param; // Big object
+#ifdef __linux__                    
                     // Try to get thread sched parameters on Linux
                     if (pthread_getschedparam(threadId, &policy, &param) == 0) [[likely]] {
                         policy = SCHED_FIFO;
