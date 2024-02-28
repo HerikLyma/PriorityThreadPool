@@ -93,7 +93,14 @@ public:
 
         // Create threads and assign tasks to them
         for (size_t i = 0; i < maxThreads; ++i) {
-            m_threads.push_back(std::jthread([this] {
+            m_threads.push_back(std::jthread([this] {                
+                // Get thread ID only once
+#ifdef __linux__
+                const auto threadId = pthread_self();
+#elif _WIN32
+                const auto threadId = GetCurrentThread();
+#endif
+                auto lastPriority = Priority::Normal;
                 while (true) {
                     // Locking mutex for thread safety
                     std::unique_lock lock(m_mutex);
@@ -101,35 +108,39 @@ public:
                     m_cv.wait(lock, [this] { return m_quit || !m_tasks.empty(); });
                     if (m_tasks.empty()) [[unlikely]] {    // If tasks are empty                    
                         if (m_quit) [[unlikely]] {         // Check if thread pool is quitting                        
-                            break;            // Break the loop if quitting
+                            break;                         // Break the loop if quitting
                         }
-                        continue;             // Continue to wait for tasks if not quitting
+                        continue;                          // Continue to wait for tasks if not quitting
                     }
-                    const auto task = m_tasks.top();    // Get the top priority task
-                    m_tasks.pop();                      // Remove the task from the queue
-                    lock.unlock();                      // Unlock the mutex
+                    const auto task = m_tasks.top();       // Get the top priority task
+                    m_tasks.pop();                         // Remove the task from the queue
+                    lock.unlock();                         // Unlock the mutex
 
+                    if (lastPriority == task.second) [[likely]] { // If the task priority is the same as the last one
+                        task.first();
+                        continue;
+                    }
+                    
+                    // When the task is priority is different from the last one
+                    lastPriority = task.second;
                     [[maybe_unused]] const auto priority = static_cast<int>(task.second); // Gets task priority
                     [[maybe_unused]] static constexpr std::string_view errorMessage("Could not change thread priority!\n");
 #ifdef __linux__
                     int policy;
-                    sched_param param;
-                    if (const auto threadId = pthread_self(); pthread_getschedparam(threadId, &policy, &param) == 0) [[likely]] {
-                        if (param.sched_priority != priority) [[unlikely]] {
-                            policy = SCHED_FIFO;
-                            param.sched_priority = priority;
-                            if (pthread_setschedparam(threadId, policy, &param) != 0) [[unlikely]] { // If fails                                
-                                std::osyncstream(std::cerr) << errorMessage;
-                            }
+                    static thread_local sched_param param; // Big object
+                    // Try to get thread sched parameters on Linux
+                    if (pthread_getschedparam(threadId, &policy, &param) == 0) [[likely]] {
+                        policy = SCHED_FIFO;
+                        param.sched_priority = priority;
+                        // Change the thread priority on Linux
+                        if (pthread_setschedparam(threadId, policy, &param) != 0) [[unlikely]] { // If fails    
+                            std::osyncstream(std::cerr) << errorMessage;
                         }
                     }
 #elif _WIN32
-                    // Change only if is different
-                    if (const auto threadId = GetCurrentThread(); GetThreadPriority(threadId) != priority) [[likely]] {
-                        // Change the thread priority on Windows
-                        if (!SetThreadPriority(threadId, priority)) [[unlikely]] {  // If fails                           
-                            std::osyncstream(std::cerr) << errorMessage;
-                        }
+                    // Change the thread priority on Windows
+                    if (!SetThreadPriority(threadId, priority)) [[unlikely]] {  // If fails                           
+                        std::osyncstream(std::cerr) << errorMessage;
                     }
 #endif
                     task.first(); // Execute the task
